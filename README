@@ -1,0 +1,59 @@
+=KayakSearch
+
+Warning, this plugin is still very much a work-in-progress and worth about what you paid for it. =^)
+
+==Usage
+
+In your config/environment.rb:
+
+  ENV['KAYAK_API_KEY'] ||= 'YOUR-API-KEY-HERE'
+
+
+In your controller:
+
+  def search_flights
+    kayak = KayakSearch.new
+    kayak.get_session
+    @search_id = kayak.start_flight_search({:origin => 'ATL', ... }) #check source for more options
+    more_pending = true
+
+    while more_pending
+      more_pending, @xml = kayak.poll_results(@search_id, :max_count => 100)
+
+      # optionally do some stuff with xml, update page, etc
+      # but more records are to come. Keep poling until more_pending comes back false
+      # which means either there are no more results or we hit our max_count
+
+      sleep 5 # Let kayak work some more before checking again.
+    end
+
+    # Here, xml will contain all of the flights found by kayak, up to optional max_search, ordered by price ASC
+    # See below for one possible way to display the records.
+
+  end
+
+
+In your view:
+
+  <% @xml.elements.each("/searchresult/trips/trip") do |trip| %>
+    <% trip.elements.each("price") do |price| %>
+      <%
+        currency = price.attribute('currency').to_s
+        url = price.attribute('url').to_s
+      %>
+      <%= link_to("$#{price}#{currency}", "http://kayak.com#{url}") %>
+      <% end %>
+    <% trip.elements.each("legs") do |leg| %>
+      Display info about individual flight legs
+    <% end %>
+  <% end %>
+
+
+Working with KayakSearch in development:
+
+  Because doing kayak searches takes at least 10 to 20 seconds or more to completely finish, and so as to not waste kayak.com's resources for my testing, I've added a mechanism for working with your application in the development environment by having KayakSearch read the search results from a local file. Two environment variables are needed, KAYAK_TEST, to indicate that you don't want to hit the api server, and KAYAK_TEST_FILE, which is the path to your dummy xml file.  I've included a sample search result in test.xml which you can use.
+
+In your config.environment.rb:
+  ENV['KAYAK_TEST'] = 'true' # Disables real api calls
+  ENV['KAYAK_TEST_FILE'] = 'path/to/test.xml' # path to test file.
+
